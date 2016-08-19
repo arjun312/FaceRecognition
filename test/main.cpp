@@ -117,7 +117,7 @@ vector<String> m_names; //add
 Ptr<cv::face::BasicFaceRecognizer> model; //SAVING //add
 vector<Mat> preprocessedFaces; //SAVING //add
 vector<int> faceLabels; //SAVING //add
-String name; //NOTSAVING //add
+std::string name; //NOTSAVING //add
 String lastseen = ""; //NOTSAVING //add
 double lastseensimilarity = 0; //NOTSAVING //add
 String currentseen; //NOTSAVING //add
