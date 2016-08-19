@@ -78,6 +78,12 @@ bool m_debug = false;
 #include <vector>
 #include <string>
 #include <iostream>
+#include <sstream> //add
+#include <fstream> //add
+#include <algorithm> //add
+#include <signal.h> //add
+#include <deque> //add
+#include <utility> //add
 
 // Include OpenCV's C++ Interface
 #include "opencv2/opencv.hpp"
@@ -103,9 +109,22 @@ enum MODES {MODE_STARTUP=0, MODE_DETECTION, MODE_COLLECT_FACES, MODE_TRAINING, M
 const char* MODE_NAMES[] = {"Startup", "Detection", "Collect Faces", "Training", "Recognition", "Delete All", "ERROR!"};
 MODES m_mode = MODE_STARTUP;
 
-int m_selectedPerson = -1;
-int m_numPersons = 0;
-vector<int> m_latestFaces;
+int m_selectedPerson = -1; //NOTSAVING
+int m_numPersons = 0; //SAVING
+vector<int> m_latestFaces; //SAVING
+vector<String> m_image_names; //SAVING //add
+vector<String> m_names; //add
+Ptr<cv::face::BasicFaceRecognizer> model; //SAVING //add
+vector<Mat> preprocessedFaces; //SAVING //add
+vector<int> faceLabels; //SAVING //add
+std::string name; //NOTSAVING //add
+String lastseen = ""; //NOTSAVING //add
+double lastseensimilarity = 0; //NOTSAVING //add
+String currentseen; //NOTSAVING //add
+
+deque< pair<String,double> > lastTenSeen; //NOTSAVING  //add
+deque< pair<String,double> > lastTenSeenOutput; //NOTSAVING  //add
+deque< pair<String,int> > totalDetection; //NOTSAVING  //add
 
 // Position of GUI buttons:
 Rect m_rcBtnAdd;
@@ -184,6 +203,200 @@ void initWebcam(VideoCapture &videoCapture, int cameraNumber)
     cout << "Loaded camera " << cameraNumber << "." << endl;
 }
 
+// Load the previously saved database if there is one
+void loadDatabase()
+{
+	// Load the model for the Eigenfaces
+	Ptr<cv::face::BasicFaceRecognizer> model /*= makePtr<cv::face::BasicFaceRecognizer>(facerecAlgorithm)*/;
+	Mat labels;
+
+	try {
+		model->load("data/trainedModel.yml");
+		labels = model->getLabels();
+	} catch (cv::Exception &e){}
+
+	if (labels.rows <= 0)
+	{
+		cout << "No database found.  Starting new database fresh." << endl;
+	}
+	
+	// Load the namesFILE
+	string line;
+	ifstream iFILE("data/data.bin", ios::in | ios::binary);
+	if (iFILE.is_open())
+	{
+		bool imageNames = false;
+		bool lFaces = false;
+		bool fLabels = false;
+		bool pNames = false;
+		
+		while (getline(iFILE,line))
+		{
+			if (pNames)
+			{
+				if (line != "SPACER")
+				{
+					m_names.push_back(line);
+				}
+				else
+				{
+					pNames = false;
+				}
+			}			
+			else if (fLabels)
+			{
+				if (line != "SPACER")
+				{
+					faceLabels.push_back(atoi(line.c_str()));
+				}
+				else
+				{
+					pNames = true;
+					fLabels = false;
+				}
+			}
+			else if (lFaces)
+			{
+				if (line != "SPACER")
+				{
+					m_latestFaces.push_back(atoi(line.c_str()));
+				}
+				else
+				{
+					fLabels = true;
+					lFaces = false;
+				}
+			}
+			else if (imageNames)
+			{
+				if (line != "SPACER")
+				{
+					m_image_names.push_back(line);
+				}
+				else
+				{
+					lFaces = true;
+					imageNames = false;
+				}
+			}
+			else
+			{
+				m_numPersons = atoi(line.c_str());
+				imageNames = true;
+			}
+		}
+		iFILE.close();
+		m_selectedPerson = m_numPersons - 1;
+	}
+	
+	
+	// Load in images
+	for (int i = 0; i < (int)m_image_names.size(); i++)
+	{
+		preprocessedFaces.push_back(imread(format("data/%s_%i.png",m_image_names[i].c_str(),i), CV_LOAD_IMAGE_UNCHANGED));
+	}
+}
+
+// Save the current database if there is one
+void saveDatabase()
+{
+	// Save the model for the Eigenfaces
+	model->save("data/trainedModel.yml");
+
+	// Save the images
+	for (int i = 0; i < (int)preprocessedFaces.size(); i++)
+	{
+		imwrite(format("data/%s_%i.png",m_image_names[i].c_str(),i), preprocessedFaces[i]);
+	}
+
+	// Save the images, names vector, major variables
+	if (m_image_names.size() > 0)
+	{
+		//Store in namesFILE
+		ofstream oFILE("data/data.bin", ios::out | ios::binary);
+		oFILE << format("%i\n",m_numPersons);
+		for (int i = 0; i < (int)m_image_names.size(); i++)
+		{
+			oFILE << format("%s\n",m_image_names[i].c_str());
+		}
+		oFILE << "SPACER\n";
+		for (int i = 0; i < (int)m_latestFaces.size(); i++)
+		{
+			oFILE << format("%i\n",m_latestFaces[i]);
+		}
+		oFILE << "SPACER\n";
+		for (int i = 0; i < (int)faceLabels.size(); i++)
+		{
+			oFILE << format("%i\n",faceLabels[i]);
+		}
+		oFILE << "SPACER\n";
+		for (int i = 0; i < (int)m_names.size(); i++)
+		{
+			oFILE << format("%s\n",m_names[i].c_str());
+		}
+		oFILE.close();
+	}
+}
+
+void printDeque(deque< pair<String, double> > d)
+{
+	cout << "PRINT DEQUE" << endl;
+	for (int i=0; i < d.size(); i++)
+	{
+		cout << d.at(i).first << " " << d.at(i).second << endl;
+	}
+	cout << "----" << endl;
+}
+
+void printDeque(deque< pair<String, int> > d)
+{
+	cout << "PRINT DEQUE" << endl;
+	for (int i=0; i < d.size(); i++)
+	{
+		cout << d.at(i).first << " " << d.at(i).second << endl;
+	}
+	cout << "----" << endl;
+}
+
+int dequeContains(deque< pair<String, double> > d, String s)
+{
+	for (int i=0; i < d.size(); i++)
+	{
+		if (d.at(i).first == s)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+int dequeContains(deque< pair<String, int> > d, String s)
+{
+	for (int i=0; i < d.size(); i++)
+	{
+		if (d.at(i).first == s)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+void calculateLastLikelyPerson()
+{
+	for(int i=0; i < lastTenSeen.size(); i++)
+	{
+		int answer = dequeContains(lastTenSeenOutput, lastTenSeen.at(i).first);
+		if (answer >= 0)
+		{
+			lastTenSeenOutput[answer].second += lastTenSeen.at(i).second;
+		}
+		else
+		{
+			lastTenSeenOutput.push_back(lastTenSeen.at(i));
+		}
+	}
+}
 
 // Draw text into an image. Defaults to top-left-justified text, but you can give negative x coords for right-justified text,
 // and/or negative y coords for bottom-justified text.
@@ -271,10 +484,16 @@ void onMouse(int event, int x, int y, int, void*)
             // Add a new person.
             m_numPersons++;
             m_latestFaces.push_back(-1); // Allocate space for an extra person.
+           	m_names.push_back("");
             cout << "Num Persons: " << m_numPersons << endl;
+			cout << "Enter person's name:";// << endl;
+			//name = "";
+			getline(cin,name);
+			//cin >> name;
         }
         // Use the newly added person. Also use the newest person even if that person was empty.
         m_selectedPerson = m_numPersons - 1;
+	  	m_names[m_selectedPerson] = name;
         m_mode = MODE_COLLECT_FACES;
     }
     else if (isPointInRect(pt, m_rcBtnDel)) {
@@ -308,10 +527,10 @@ void onMouse(int event, int x, int y, int, void*)
         // Otherwise they clicked in the center.
         else {
             // Change to training mode if it was collecting faces.
-            if (m_mode == MODE_COLLECT_FACES) {
+            //if (m_mode == MODE_COLLECT_FACES) {
                 cout << "User wants to begin training." << endl;
                 m_mode = MODE_TRAINING;
-            }
+            //}
         }
     }
 }
@@ -327,7 +546,14 @@ void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier 
     double old_time = 0;
 
     // Since we have already initialized everything, lets start in Detection mode.
-    m_mode = MODE_DETECTION;
+	if (m_numPersons > 0)
+	{
+		m_mode = MODE_RECOGNITION;
+	}
+	else
+	{
+		m_mode = MODE_DETECTION;
+	}
 
 
     // Run forever, until the user hits Escape to "break" out of this loop.
@@ -400,11 +626,14 @@ void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier 
                     preprocessedFaces.push_back(mirroredFace);
                     faceLabels.push_back(m_selectedPerson);
                     faceLabels.push_back(m_selectedPerson);
+			  		m_image_names.push_back(m_names[m_selectedPerson]); //Saves name of person entered in vector
+					m_image_names.push_back(m_names[m_selectedPerson]);
 
                     // Keep a reference to the latest face of each person.
                     m_latestFaces[m_selectedPerson] = preprocessedFaces.size() - 2;  // Point to the non-mirrored face.
+                    
                     // Show the number of collected faces. But since we also store mirrored faces, just show how many the user thinks they stored.
-                    cout << "Saved face " << (preprocessedFaces.size()/2) << " for person " << m_selectedPerson << endl;
+                    cout << "Saved face " << (preprocessedFaces.size()/2) << " for person " << m_image_names.back() << endl;
 
                     // Make a white flash on the face, so the user knows a photo has been taken.
                     Mat displayedFaceRegion = displayedFrame(faceRect);
@@ -466,12 +695,35 @@ void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier 
                 if (similarity < UNKNOWN_PERSON_THRESHOLD) {
                     // Identify who the person is in the preprocessed face image.
                     identity = model->predict(preprocessedFace);
-                    outputStr = toString(identity);
+                    outputStr = m_names[atoi(toString(identity).c_str())];
+
+					currentseen = outputStr;
+
+					if(lastTenSeen.size() >= 10) {
+						lastTenSeen.pop_front();
+					}
+
+					lastTenSeenOutput.clear(); //Not sure if it is correct method
+					pair<String,double> lTSO (outputStr, 1-similarity);
+					lastTenSeen.push_back(lTSO);
+					calculateLastLikelyPerson();
                 }
                 else {
                     // Since the confidence is low, assume it is an unknown person.
                     outputStr = "Unknown";
+					currentseen = outputStr;
                 }
+                
+                				int cont = dequeContains(totalDetection, outputStr);
+				if (cont >= 0)
+				{
+					totalDetection[cont].second += 1;
+				}
+				else {
+					pair<String,int> tD (outputStr, 1);
+					totalDetection.push_back(tD);
+				}
+                
                 cout << "Identity: " << outputStr << ". Similarity: " << similarity << endl;
 
                 // Show the confidence rating for the recognition in the mid-top of the display.
@@ -489,6 +741,9 @@ void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier 
                 // Show the gray border of the bar.
                 rectangle(displayedFrame, ptTopLeft, ptBottomRight, CV_RGB(200,200,200), 1, CV_AA);
             }
+            else {
+				currentseen = "None";
+			}
         }
         else if (m_mode == MODE_DELETE_ALL) {
             // Restart everything!
@@ -497,7 +752,10 @@ void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier 
             m_latestFaces.clear();
             preprocessedFaces.clear();
             faceLabels.clear();
+			m_image_names.clear();
+			m_names.clear();
             old_prepreprocessedFace = Mat();
+			system("exec rm -r ./data/*");
 
             // Restart in Detection mode.
             m_mode = MODE_DETECTION;
@@ -553,8 +811,8 @@ void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier 
 
         // Draw the GUI buttons into the main image.
         m_rcBtnAdd = drawButton(displayedFrame, "Add Person", Point(BORDER, BORDER));
-        m_rcBtnDel = drawButton(displayedFrame, "Delete All", Point(m_rcBtnAdd.x, m_rcBtnAdd.y + m_rcBtnAdd.height), m_rcBtnAdd.width);
-        m_rcBtnDebug = drawButton(displayedFrame, "Debug", Point(m_rcBtnDel.x, m_rcBtnDel.y + m_rcBtnDel.height), m_rcBtnAdd.width);
+        //m_rcBtnDel = drawButton(displayedFrame, "Delete All", Point(m_rcBtnAdd.x, m_rcBtnAdd.y + m_rcBtnAdd.height), m_rcBtnAdd.width);
+        //m_rcBtnDebug = drawButton(displayedFrame, "Debug", Point(m_rcBtnDel.x, m_rcBtnDel.y + m_rcBtnDel.height), m_rcBtnAdd.width);
 
         // Show the most recent face for each of the collected people, on the right side of the display.
         m_gui_faces_left = displayedFrame.cols - BORDER - faceWidth;
@@ -620,6 +878,15 @@ void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier 
 
         if (keypress == VK_ESCAPE) {   // Escape Key
             // Quit the program!
+			saveDatabase();
+			// For demonstration purposes...
+			printDeque(totalDetection);
+			int totalFaces = 0;
+			for (int i=0; i < totalDetection.size(); i++)
+			{
+				totalFaces += totalDetection.at(i).second;
+			}
+			cout << "Total faces detected: " << totalFaces << endl;
             break;
         }
 
