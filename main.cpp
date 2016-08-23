@@ -207,11 +207,11 @@ void initWebcam(VideoCapture &videoCapture, int cameraNumber)
 void loadDatabase()
 {
 	// Load the model for the Eigenfaces
-	Ptr<cv::face::BasicFaceRecognizer> model /*= makePtr<cv::face::BasicFaceRecognizer>(facerecAlgorithm)*/;
+    Ptr<cv::face::BasicFaceRecognizer> model = cv::face::createEigenFaceRecognizer() /*makePtr<cv::face::BasicFaceRecognizer>(facerecAlgorithm)*/;
 	Mat labels;
 
 	try {
-		model->load("data/trainedModel.yml");
+		model->load("../data/trainedModel.yml");
 		labels = model->getLabels();
 	} catch (cv::Exception &e){}
 
@@ -222,7 +222,7 @@ void loadDatabase()
 	
 	// Load the namesFILE
 	string line;
-	ifstream iFILE("data/data.bin", ios::in | ios::binary);
+	ifstream iFILE("../data/data.bin", ios::in | ios::binary);
 	if (iFILE.is_open())
 	{
 		bool imageNames = false;
@@ -293,27 +293,27 @@ void loadDatabase()
 	// Load in images
 	for (int i = 0; i < (int)m_image_names.size(); i++)
 	{
-		preprocessedFaces.push_back(imread(format("data/%s_%i.png",m_image_names[i].c_str(),i), CV_LOAD_IMAGE_UNCHANGED));
+		preprocessedFaces.push_back(imread(format("../data/%s_%i.png",m_image_names[i].c_str(),i), CV_LOAD_IMAGE_UNCHANGED));
 	}
 }
 
 // Save the current database if there is one
-void saveDatabase()
+void saveDatabase(Ptr<cv::face::BasicFaceRecognizer> model)
 {
 	// Save the model for the Eigenfaces
-	model->save("data/trainedModel.yml");
+	model->save("../data/trainedModel.yml");
 
 	// Save the images
 	for (int i = 0; i < (int)preprocessedFaces.size(); i++)
 	{
-		imwrite(format("data/%s_%i.png",m_image_names[i].c_str(),i), preprocessedFaces[i]);
+		imwrite(format("../data/%s_%i.png",m_image_names[i].c_str(),i), preprocessedFaces[i]);
 	}
 
 	// Save the images, names vector, major variables
 	if (m_image_names.size() > 0)
 	{
 		//Store in namesFILE
-		ofstream oFILE("data/data.bin", ios::out | ios::binary);
+		ofstream oFILE("../data/data.bin", ios::out | ios::binary);
 		oFILE << format("%i\n",m_numPersons);
 		for (int i = 0; i < (int)m_image_names.size(); i++)
 		{
@@ -878,7 +878,7 @@ void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier 
 
         if (keypress == VK_ESCAPE) {   // Escape Key
             // Quit the program!
-			saveDatabase();
+			saveDatabase(model);
 			// For demonstration purposes...
 			printDeque(totalDetection);
 			int totalFaces = 0;
