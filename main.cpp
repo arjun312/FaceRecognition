@@ -207,7 +207,7 @@ void initWebcam(VideoCapture &videoCapture, int cameraNumber)
 void loadDatabase()
 {
 	// Load the model for the Eigenfaces
-    Ptr<cv::face::BasicFaceRecognizer> model = cv::face::createEigenFaceRecognizer() /*makePtr<cv::face::BasicFaceRecognizer>(facerecAlgorithm)*/;
+    Ptr<cv::face::BasicFaceRecognizer> model = cv::face::createEigenFaceRecognizer(); /*makePtr<cv::face::BasicFaceRecognizer>(facerecAlgorithm);*/
 	Mat labels;
 
 	try {
