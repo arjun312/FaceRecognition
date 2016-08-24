@@ -213,6 +213,7 @@ void loadDatabase()
 	try {
 		model->load("../data/trainedModel.yml");
 		labels = model->getLabels();
+                printf ("test");
 	} catch (cv::Exception &e){}
 
 	if (labels.rows <= 0)
@@ -919,6 +920,9 @@ int main(int argc, char *argv[])
 
     // Get access to the webcam.
     initWebcam(videoCapture, cameraNumber);
+    
+    // Initialize the model from the precollected database
+    loadDatabase();
 
     // Try to set the camera resolution. Note that this only works for some cameras on
     // some computers and only for some drivers, so don't rely on it to work!
