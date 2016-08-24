@@ -213,7 +213,6 @@ void loadDatabase()
 	try {
 		model->load("../data/trainedModel.yml");
 		labels = model->getLabels();
-                printf ("test");
 	} catch (cv::Exception &e){}
 
 	if (labels.rows <= 0)
