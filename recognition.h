@@ -31,6 +31,7 @@
 
 
 using namespace cv;
+using namespace cv::face;
 using namespace std;
 
 
@@ -40,13 +41,13 @@ using namespace std;
 //    "FaceRecognizer.Eigenfaces":  Eigenfaces, also referred to as PCA (Turk and Pentland, 1991).
 //    "FaceRecognizer.Fisherfaces": Fisherfaces, also referred to as LDA (Belhumeur et al, 1997).
 //    "FaceRecognizer.LBPH":        Local Binary Pattern Histograms (Ahonen et al, 2006).
-Ptr<cv::face::BasicFaceRecognizer> learnCollectedFaces(const vector<Mat> preprocessedFaces, const vector<int> faceLabels, const string facerecAlgorithm = "FaceRecognizer.Eigenfaces");
+Ptr<BasicFaceRecognizer> learnCollectedFaces(const vector<Mat> preprocessedFaces, const vector<int> faceLabels, const string facerecAlgorithm = "FaceRecognizer.Eigenfaces");
 
 // Show the internal face recognition data, to help debugging.
-void showTrainingDebugData(const Ptr<cv::face::BasicFaceRecognizer> model, const int faceWidth, const int faceHeight);
+void showTrainingDebugData(const Ptr<BasicFaceRecognizer> model, const int faceWidth, const int faceHeight);
 
 // Generate an approximately reconstructed face by back-projecting the eigenvectors & eigenvalues of the given (preprocessed) face.
-Mat reconstructFace(const Ptr<cv::face::BasicFaceRecognizer> model, const Mat preprocessedFace);
+Mat reconstructFace(const Ptr<BasicFaceRecognizer> model, const Mat preprocessedFace);
 
 // Compare two images by getting the L2 error (square-root of sum of squared error).
 double getSimilarity(const Mat A, const Mat B);

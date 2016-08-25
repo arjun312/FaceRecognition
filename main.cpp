@@ -96,6 +96,7 @@ bool m_debug = false;
 #include "ImageUtils.h"      // Shervin's handy OpenCV utility functions.
 
 using namespace cv;
+using namespace cv::face;
 using namespace std;
 
 
@@ -112,19 +113,19 @@ MODES m_mode = MODE_STARTUP;
 int m_selectedPerson = -1; //NOTSAVING
 int m_numPersons = 0; //SAVING
 vector<int> m_latestFaces; //SAVING
-vector<String> m_image_names; //SAVING //add
-vector<String> m_names; //add
-Ptr<cv::face::BasicFaceRecognizer> model; //SAVING //add
-vector<Mat> preprocessedFaces; //SAVING //add
-vector<int> faceLabels; //SAVING //add
-std::string name; //NOTSAVING //add
-String lastseen = ""; //NOTSAVING //add
-double lastseensimilarity = 0; //NOTSAVING //add
-String currentseen; //NOTSAVING //add
+vector<String> m_image_names; //SAVING
+vector<String> m_names; 
+Ptr<BasicFaceRecognizer> model; //SAVING
+vector<Mat> preprocessedFaces; //SAVING
+vector<int> faceLabels; //SAVING
+std::string name; //NOTSAVING
+String lastseen = ""; //NOTSAVING
+double lastseensimilarity = 0; //NOTSAVING
+String currentseen; //NOTSAVING
 
-deque< pair<String,double> > lastTenSeen; //NOTSAVING  //add
-deque< pair<String,double> > lastTenSeenOutput; //NOTSAVING  //add
-deque< pair<String,int> > totalDetection; //NOTSAVING  //add
+deque< pair<String,double> > lastTenSeen; //NOTSAVING
+deque< pair<String,double> > lastTenSeenOutput; //NOTSAVING
+deque< pair<String,int> > totalDetection; //NOTSAVING
 
 // Position of GUI buttons:
 Rect m_rcBtnAdd;
@@ -207,7 +208,7 @@ void initWebcam(VideoCapture &videoCapture, int cameraNumber)
 void loadDatabase()
 {
 	// Load the model for the Eigenfaces
-    Ptr<cv::face::BasicFaceRecognizer> model = cv::face::createEigenFaceRecognizer(); /*makePtr<cv::face::BasicFaceRecognizer>(facerecAlgorithm);*/
+    Ptr<BasicFaceRecognizer> model = createEigenFaceRecognizer(); /*makePtr<cv::face::BasicFaceRecognizer>(facerecAlgorithm);*/
 	Mat labels;
 
 	try {
@@ -298,7 +299,7 @@ void loadDatabase()
 }
 
 // Save the current database if there is one
-void saveDatabase(Ptr<cv::face::BasicFaceRecognizer> model)
+void saveDatabase(Ptr<BasicFaceRecognizer> model)
 {
 	// Save the model for the Eigenfaces
 	model->save("../data/trainedModel.yml");
@@ -539,7 +540,7 @@ void onMouse(int event, int x, int y, int, void*)
 // Main loop that runs forever, until the user hits Escape to quit.
 void recognizeAndTrainUsingWebcam(VideoCapture &videoCapture, CascadeClassifier &faceCascade, CascadeClassifier &eyeCascade1, CascadeClassifier &eyeCascade2)
 {
-	Ptr<cv::face::BasicFaceRecognizer> model;
+	Ptr<BasicFaceRecognizer> model;
     vector<Mat> preprocessedFaces;
     vector<int> faceLabels;
     Mat old_prepreprocessedFace;
